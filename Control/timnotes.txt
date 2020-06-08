@@ -1,0 +1,98 @@
+{- A resource is a pair of a label and the current type stored there -}
+public export
+data Resource : Type where
+     MkRes : label -> Type -> Resource
+
+export
+data Var = MkVar -- Phantom, just for labelling purposes
+
+resfoo : Resource
+resfoo = MkRes MkVar Int
+
+{- Contexts for holding current resources states -}
+namespace Resources
+  public export
+ data Resources : Type where
+       Nil : Resources
+       (::) : Resource -> Resources -> Resources
+
+  public export
+  (++) : Resources -> Resources -> Resources
+  (++) [] ys = ys
+  (++) (x :: xs) ys = x :: xs ++ ys
+
+ressfoo : Resources
+ressfoo = (MkRes MkVar String) :: Nil
+
+--shows where a var is in a list of resources
+data VarInRes : Var -> Resources -> Type where
+     VarHere   : VarInRes a (MkRes a st :: as)
+     VarThere  : VarInRes a as -> VarInRes a (b :: as)
+
+virFoo : VarInRes (MkVar) ((MkRes MkVar String) :: Nil)
+virFoo = VarHere
+
+{- Proof that every variable in the list appears once in the context -}
+-- note that it seems impossible for "el" in InResVar to be anything other
+-- than VarHere. Since in order to construct a res with 1 element that
+-- doesn't have a VarHere, you need to use SkipVar. Then if you want to
+-- reference it with a VarThere, you couldn't do it, because you'd need
+-- to supply VarsIn xs (dropVarIn ys el), so 
+public export
+data VarsIn : List Var -> Resources -> Type where
+     VarsNil : VarsIn [] []
+     SkipVar : VarsIn xs ys -> VarsIn xs (y :: ys)
+     InResVar : (el : VarInRes x ys) -> VarsIn xs (dropVarIn ys el) ->
+                 VarsIn (x :: xs) ys
+
+public export --%error_reduce
+dropVarIn : (ys: _) -> VarInRes x ys -> Resources
+dropVarIn ((MkRes x _) :: as) VarHere = as
+dropVarIn (x :: as) (VarThere p) = x :: dropVarIn as p
+
+-- Composite is simple a list of values (of different types)
+public export
+data Composite : List Type -> Type where
+     CompNil : Composite []
+     CompCons : (x : a) -> Composite as -> Composite (a :: as)
+
+--just return types for (unique list of vars in resources)
+public export
+getCombineType : {xs : _} -> VarsIn ys xs -> List Type
+getCombineType VarsNil = []
+getCombineType (InResVar el y) = getVarType _ el :: getCombineType y
+getCombineType (SkipVar x) = getCombineType x
+
+--returns a type of a vir
+public export
+getVarType : (xs : Resources) -> VarInRes v xs -> Type
+getVarType ((MkRes v st) :: as) VarHere = st
+getVarType (b :: as) (VarThere x) = getVarType as x
+
+
+vir - VarInRes var res -> Var (single) in Resource
+vi - VarsIn (List Var) res -> vars in resource (all vars are proven unique in res)
+
+dropEntry : Env res -> (prf : VarInRes x res) -> Env (dropVarIn res prf)
+dropEntry (x :: env) VarHere = env
+dropEntry (x :: env) (VarThere y) = x :: dropEntry env y
+
+Left Side:
+(Composite ((getVarType res vir) :: getCombineType vi))
+
+vi implies a resources, but it does not necessarily have to be "res".
+All composite is, is a list of types, it doesn't care.
+
+
+Right Side:
+(Composite (getCombineType (InResVar vir vi)))
+
+--note that InResVar not only proves it exists, but it only exists once in res
+--getcombinetype converts this to a unique list of types
+
+-----
+
+dropPrf
+
+res -- Resources
+prf -- a subset of vars in res
