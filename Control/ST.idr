@@ -43,7 +43,8 @@ ressfoo = (MkRes MkVar String) :: Nil
 
 {- Proof that a label has a particular type in a given context -}
 public export
-data InState : Var -> Type -> Resources -> Type where
+data InState : (x : Var) -> Type -> Resources -> Type where
+     [search x]
      Here : InState lbl t (MkRes lbl t :: res)
      There : InState lbl t res -> InState lbl t (re :: res)
 
